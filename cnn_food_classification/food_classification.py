@@ -71,9 +71,9 @@ batch_size=128
 train_set=ImgDataset(train_x,train_y,train_transform)
 val_set=ImgDataset(val_x,val_y,test_transform)
 train_loader=DataLoader(train_set,batch_size=batch_size,shuffle=True)
-val_loader=DataLoader(val_set,batch_size=batch_size,shuffle=True)
+val_loader=DataLoader(val_set,batch_size=batch_size,shuffle=False)
 
-model=cnnModel.classifier()
+model=cnnModel.classifier().cuda()
 loss=nn.CrossEntropyLoss()
 optimizer=torch.optim.Adam(model.parameters(),lr=0.001)
 num_epoch=30
@@ -88,8 +88,8 @@ for epoch in range(num_epoch):
     model.train()
     for i, data in enumerate(train_loader):
         optimizer.zero_grad()
-        train_pred=model(data[0])
-        batch_loss=loss(train_pred,data[1])
+        train_pred=model(data[0].cuda())
+        batch_loss=loss(train_pred,data[1].cuda())
         batch_loss.backward()
         optimizer.step()
         train_acc+=np.sum(np.argmax(train_pred.cpu().data.numpy(),axis=1)==data[1].numpy())
@@ -97,8 +97,8 @@ for epoch in range(num_epoch):
     model.eval()
     with torch.no_grad():
         for i, data in enumerate(val_loader):
-            val_pred=model(data[0])
-            batch_loss=loss(val_pred,data[1])
+            val_pred=model(data[0].cuda())
+            batch_loss=loss(val_pred,data[1].cuda())
             val_acc+=np.sum(np.argmax(val_pred.cpu().data.numpy(),axis=1)==data[1].numpy())
         print('[%03d/%03d] %2.2f sec(s) Train Acc: %3.6f Loss: %3.6f | Val Acc: %3.6f loss: %3.6f' % \
               (epoch + 1, num_epoch, time.time() - epoch_start_time, \
@@ -111,7 +111,7 @@ train_val_y=np.concatenate((train_y,val_y),axis=0)
 train_val_set=ImgDataset(train_val_x,train_val_y,train_transform)
 train_val_loader=DataLoader(train_val_set,batch_size=batch_size,shuffle=True)
 
-model_best=cnnModel.classifier()
+model_best=cnnModel.classifier().cuda()
 loss=nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model_best.parameters(), lr=0.001) # optimizer 使用 Adam
 num_epoch = 30
@@ -144,7 +144,7 @@ model_best.eval()
 prediction=[]
 with torch.no_grad():
     for i,data in enumerate(test_loader):
-        test_pred=model_best(data)
+        test_pred=model_best(data.cuda())
         test_label=np.argmax(test_pred.cpu().data.numpy(),axis=1)
         for y in test_label:
             prediction.append(y)
