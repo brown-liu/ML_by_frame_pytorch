@@ -11,6 +11,8 @@ import time
 from cnn_food_classification.CnnCore import cnnModel
 
 
+
+
 def readimage(path,hasLabel):
     image_dir=sorted(os.listdir(path))
     x=np.zeros((len(image_dir),128,128,3),dtype=np.uint8)
@@ -53,31 +55,35 @@ class ImgDataset(Dataset):
         self.y=y
         if y is not None:
             self.y=torch.LongTensor(y)
-        self.transofm=transform
+        self.transform=transform
 
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, index):
         X=self.x[index]
-        if self.transofm is not None:
-            X=self.transofm(X)
+        if self.transform is not None:
+            X=self.transform(X)
         if self.y is not None:
             Y=self.y[index]
             return X,Y
         else:return X
 
+print("70####################### step 1 ##############################")
+print("step 1 start")
 batch_size=128
 train_set=ImgDataset(train_x,train_y,train_transform)
 val_set=ImgDataset(val_x,val_y,test_transform)
 train_loader=DataLoader(train_set,batch_size=batch_size,shuffle=True)
 val_loader=DataLoader(val_set,batch_size=batch_size,shuffle=False)
+print("77####################### step 2 ##############################")
+
 
 model=cnnModel.classifier().cuda()
 loss=nn.CrossEntropyLoss()
 optimizer=torch.optim.Adam(model.parameters(),lr=0.001)
 num_epoch=30
-
+print("84####################### start for loop 1 ##############################")
 for epoch in range(num_epoch):
     epoch_start_time=time.time()
     train_acc=0.0
@@ -86,6 +92,7 @@ for epoch in range(num_epoch):
     val_loss=0.0
 
     model.train()
+    print("93####################### start for loop 2 ##############################")
     for i, data in enumerate(train_loader):
         optimizer.zero_grad()
         train_pred=model(data[0].cuda())
@@ -93,25 +100,29 @@ for epoch in range(num_epoch):
         batch_loss.backward()
         optimizer.step()
         train_acc+=np.sum(np.argmax(train_pred.cpu().data.numpy(),axis=1)==data[1].numpy())
+        train_loss += batch_loss.item()
 
     model.eval()
+    print("103####################### start with torch.no_grad(): ##############################")
     with torch.no_grad():
         for i, data in enumerate(val_loader):
             val_pred=model(data[0].cuda())
             batch_loss=loss(val_pred,data[1].cuda())
-            val_acc+=np.sum(np.argmax(val_pred.cpu().data.numpy(),axis=1)==data[1].numpy())
+            val_acc += np.sum(np.argmax(val_pred.cpu().data.numpy(), axis=1) == data[1].numpy())
+            val_loss += batch_loss.item()
         print('[%03d/%03d] %2.2f sec(s) Train Acc: %3.6f Loss: %3.6f | Val Acc: %3.6f loss: %3.6f' % \
               (epoch + 1, num_epoch, time.time() - epoch_start_time, \
                train_acc / train_set.__len__(), train_loss / train_set.__len__(), val_acc / val_set.__len__(),
                val_loss / val_set.__len__()))
 
 # increase amount of data for training
+print("115####################### start with torch.no_grad(): ##############################")
 train_val_x=np.concatenate((train_x,val_x),axis=0)
 train_val_y=np.concatenate((train_y,val_y),axis=0)
 train_val_set=ImgDataset(train_val_x,train_val_y,train_transform)
 train_val_loader=DataLoader(train_val_set,batch_size=batch_size,shuffle=True)
 
-model_best=cnnModel.classifier().cuda()
+model_best=cnnModel.classifier()
 loss=nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model_best.parameters(), lr=0.001) # optimizer 使用 Adam
 num_epoch = 30
@@ -144,7 +155,7 @@ model_best.eval()
 prediction=[]
 with torch.no_grad():
     for i,data in enumerate(test_loader):
-        test_pred=model_best(data.cuda())
+        test_pred=model_best(data)
         test_label=np.argmax(test_pred.cpu().data.numpy(),axis=1)
         for y in test_label:
             prediction.append(y)
