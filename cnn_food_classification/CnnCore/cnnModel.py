@@ -2,7 +2,7 @@ import torch.nn as nn
 
 class classifier(nn.Module):
     def __init__(self):
-        super(classifier,self).__init__()
+        super().__init__()
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
