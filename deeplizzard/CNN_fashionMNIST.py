@@ -64,8 +64,11 @@ cnnV1=Network()
 train_loader=torch.utils.data.DataLoader(train_set,batch_size=100)
 optimzer=torch.optim.Adam(cnnV1.parameters(),lr=0.01)
 
+EPOCH=3
 
-def train_network():
+
+
+for epoch in tqdm(range(EPOCH)):
     total_run = 0
     total_correct = 0
     for batch in tqdm(train_loader):
@@ -86,9 +89,7 @@ def train_network():
           f'Total corect = {total_correct}')
 
 
-for i in range(3):
-    train_network()
-#save and load Model parameters
+
 
 
 torch.save(cnnV1.state_dict(), f'cnnV1params{str(time.time())}.pkl')
