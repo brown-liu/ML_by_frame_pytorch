@@ -76,22 +76,59 @@ if IsWorkingOnMac:
 else:
     Localroot='D:\DataSets'
 
-train_set=torchvision.datasets.FashionMNIST(root=Localroot,
-                                            train=True,
-                                            download=False,
-                                            transform=transforms.Compose([transforms.ToTensor()]))
+IsCudaAvailable=True
+if IsCudaAvailable:
+    device_select='cuda'
+    print(f'Using Cuda By {torch.cuda.get_device_name()}')
+else:
+    device_select='cpu'
+    print('Using CPU ONLY')
+device=torch.device(device_select)
+
+
+train_set=torchvision.datasets.FashionMNIST(
+    root=Localroot,
+    train=True,
+    download=False,
+    transform=transforms.Compose([transforms.ToTensor()]))
+
+loader_temp=torch.utils.data.DataLoader(train_set)
+data_temp=next(iter(loader_temp))
+mean=data_temp[0].mean()
+std=data_temp[0].std()
+
+train_set_normal=torchvision.datasets.FashionMNIST(
+         root=Localroot,
+    train=True,
+    download=True,
+    transform=transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean,std)
+    ])
+)
+
+@torch.no_grad()
 def get_accuracy(pred,labels):
     return pred.argmax(dim=1).eq(labels).sum().item()
 
 
-params=OrderedDict(lr=[0.01,0.001],batch_size=[500,1000,10000],EPOCH=[3,5,10],shuffle=[True,False])
-runs=RunBuilder.get_runs(params)
-cnnV1=Network()
+params=OrderedDict(lr=[0.005,0.001],batch_size=[1000,5000,10000],shuffle=[True])
+EPOCH=20
 
-for lr,batch_size,EPOCH,shuffle in runs:
+
+total_iternation=1
+for keys in params:
+    total_iternation*=len(params[keys])
+total_iternation=total_iternation*EPOCH
+
+runs=RunBuilder.get_runs(params)
+cnnV1=Network().to(device)
+count_iter=0
+for lr,batch_size,shuffle in runs:
+
     comment = f' batch_size={batch_size} lr={lr} shuffle={shuffle} EPOCH= {EPOCH}'
     tb = SummaryWriter(comment=comment)
-    train_loader=torch.utils.data.DataLoader(train_set,batch_size=batch_size,shuffle=shuffle)
+    train_loader=torch.utils.data.DataLoader(train_set_normal,batch_size=batch_size,shuffle=shuffle)
     optimzer=torch.optim.Adam(cnnV1.parameters(),lr=lr)
 
 
@@ -99,15 +136,18 @@ for lr,batch_size,EPOCH,shuffle in runs:
     grid=torchvision.utils.make_grid(image001)
 
     tb.add_image('IMAGE',grid)
-    tb.add_graph(cnnV1,image001)
+    tb.add_graph(cnnV1,image001.to(device))
 
 
     for epoch in range(EPOCH):
         total_run = 0
         total_correct = 0
         total_loss=0
+        count_iter+=1
+        print(f'Computing {count_iter}/{total_iternation}')
         for batch in tqdm(train_loader):
-            images,labels=batch
+            images=batch[0].to(device)
+            labels=batch[1].to(device)
             preds=cnnV1(images)
             loss=F.cross_entropy(preds,labels)
 
@@ -121,7 +161,7 @@ for lr,batch_size,EPOCH,shuffle in runs:
 
         tb.add_scalar('LOSS',total_loss,epoch)
         tb.add_scalar('Number Correct',total_correct,epoch)
-        tb.add_scalar("Accuracy",(total_correct / total_run),epoch)
+        tb.add_scalar("Accuracy",(total_correct / total_run*100),epoch)
 
         tb.add_histogram("conv1.bias",cnnV1.conv1.bias,epoch)
         tb.add_histogram("conv1.weight",cnnV1.conv1.weight,epoch)
@@ -129,7 +169,7 @@ for lr,batch_size,EPOCH,shuffle in runs:
 
 
         print(f' batch_size={batch_size} lr={lr} shuffle={shuffle} EPOCH= {EPOCH}')
-        print(f'total data unit = {total_run} Accuracy = {round(total_correct / total_run, 3)}% Total corect = {total_correct}')
+        print(f'total data unit = {total_run} Accuracy = {round(total_correct / total_run*100, 3)}% Total corect = {total_correct}\n')
 
     tb.close()
 
